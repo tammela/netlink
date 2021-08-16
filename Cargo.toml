@@ -1,0 +1,10 @@
+[package]
+name = "netlink"
+version = "0.1.0"
+edition = "2018"
+links = "mnl"
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+bindgen = "0.59"
+pkg-config = "0.3"
