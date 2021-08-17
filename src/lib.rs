@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::ffi;
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::Drop;
 use std::ptr;
@@ -28,7 +29,7 @@ impl RtnlHandle {
         }
     }
 
-    pub fn talk(&mut self, mut msg: Nlmsghdr) -> Result<()> {
+    pub fn talk<P, const N: usize>(&mut self, mut msg: Nlmsghdr<P, N>) -> Result<()> {
         let msg_ptr = &mut msg as *mut _ as *mut sys::nlmsghdr;
         let mut null = ptr::null_mut();
         let err = unsafe { sys::rtnl_talk(self.as_cptr(), msg_ptr, &mut null as *mut _) };
@@ -47,18 +48,25 @@ impl RtnlHandle {
 impl Drop for RtnlHandle {
     fn drop(&mut self) {
         unsafe {
-            sys::rtnl_close(&mut self.handle as *mut _);
+            sys::rtnl_close(self.as_cptr());
         }
     }
 }
 
-pub struct Nlmsghdr {
-    data: [u8; 512],
+pub struct Nlmsghdr<P, const N: usize> {
+    data: [u8; N],
+    _payload: PhantomData<P>,
 }
 
-impl Nlmsghdr {
+impl<P, const N: usize> Nlmsghdr<P, N> {
     pub fn new() -> Self {
-        Nlmsghdr { data: [0; 512] }
+        let mut nlmsghdr = Nlmsghdr {
+            data: [0; N],
+            _payload: PhantomData,
+        };
+        let hdr = nlmsghdr.header();
+        hdr.nlmsg_len = (mem::size_of::<sys::nlmsghdr>() + mem::size_of::<P>()) as u32;
+        nlmsghdr
     }
 
     pub fn maxlen(&self) -> usize {
@@ -69,10 +77,10 @@ impl Nlmsghdr {
         unsafe { &mut *(self.as_cptr()) }
     }
 
-    pub fn payload<T>(&mut self) -> &mut T {
+    pub fn payload(&mut self) -> &mut P {
         unsafe {
             let data = sys::nlmsg_data(self.as_cptr());
-            &mut *(data as *mut T)
+            &mut *(data as *mut P)
         }
     }
 
@@ -80,8 +88,8 @@ impl Nlmsghdr {
     where
         T: AttributeData,
     {
+        let data_ptr = data.as_mut_cptr();
         unsafe {
-            let data_ptr = data.as_mut_cptr();
             sys::addattr_l(
                 self.as_cptr(),
                 self.maxlen() as i32,
@@ -94,7 +102,7 @@ impl Nlmsghdr {
 
     pub fn addattr_nest<F>(&mut self, type_: u32, mut func: F)
     where
-        F: FnMut(&mut Nlmsghdr),
+        F: FnMut(&mut Nlmsghdr<P, N>),
     {
         unsafe {
             let nest = sys::addattr_nest(self.as_cptr(), self.maxlen() as i32, type_ as i32);
