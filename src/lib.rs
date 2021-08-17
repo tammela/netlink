@@ -166,20 +166,3 @@ impl AttributeData for &[u8] {
         ptr as *mut ffi::c_void
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn simple() -> Result<()> {
-        let mut handle = RtnlHandle::new()?;
-        let mut msg = Nlmsghdr::new();
-        msg.addattr(tc::TCA_ACT_MIRRED, 10);
-        msg.addattr_nest(tc::TCA_ACT_MIRRED, |msg| {
-            msg.addattr(tc::TCA_ACT_MIRRED, 32)
-        });
-        handle.talk(msg)?;
-        Ok(())
-    }
-}
