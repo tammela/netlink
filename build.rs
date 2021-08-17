@@ -1,6 +1,6 @@
-extern crate bindgen;
-extern crate cc;
-extern crate pkg_config;
+use bindgen;
+use cc;
+use pkg_config;
 
 use std::env;
 use std::path::PathBuf;
@@ -12,9 +12,7 @@ fn main() {
     println!("cargo:rerun-if-changed=libnetlink.c");
 
     // Probe libmnl as we depend on it
-    // pkg_config::Config::new().probe("libmnl").unwrap();
-    //
-    println!("cargo:rustc-link-lib=dylib=mnl");
+    pkg_config::Config::new().probe("libmnl").unwrap();
 
     // Build libnetlink
     cc::Build::new().file("libnetlink.c").compile("nn");
